@@ -644,7 +644,7 @@ with col1:
 
 with col2:
     # Create tabs for displaying calculated parameters and their formulas
-    calc_tab, formula_tab, explosive_tab = st.tabs(["Calculations", "Formulas", "Explosive Parameters"])
+    calc_tab, formula_tab, explosive_tab, flyrock_tab = st.tabs(["Calculations", "Formulas", "Explosive Parameters", "Flyrock Analysis"])
     
     with calc_tab:
         # Calculate burden-to-spacing ratio and volume per hole
@@ -736,6 +736,132 @@ with col2:
         - Total Explosive Used (Q_total): {total_explosive:.2f} kg
         - Powder Factor (Volume/Explosive): {powder_factor_vol_per_explosive:.2f} m³/kg
         - Powder Factor (Explosive/Volume): {powder_factor_explosive_per_vol:.2f} kg/m³
+        """)
+    
+    with flyrock_tab:
+        st.subheader("Flyrock Distance Predictions (Roth, 1979)")
+        
+        st.markdown("""
+        This analysis uses the empirical formulas from **Roth (1979)** to estimate flyrock throw distances 
+        for safety planning. Two scenarios are calculated:
+        
+        1. **Expected Flyrock** - Normal vertical face blast with proper design
+        2. **Wild Flyrock** - Maximum safety limit (worst-case: cratering, poor stemming, geological faults)
+        """)
+        
+        # Convert parameters to Imperial units for Roth formulas
+        hole_diameter_inches = hole_diameter / 25.4  # mm to inches
+        burden_feet = calculated_burden * 3.28084  # meters to feet
+        
+        # A. Expected Flyrock (Normal Vertical Face) - Equation 20, Page 532
+        # L_expected (ft) = 0.334 × [895,000 × (d_in / (12 × b_ft))² - 584]
+        # Note: Original uses d/(12*b) where d is in inches and b is in feet
+        ratio_term = (hole_diameter_inches / (12 * burden_feet)) ** 2
+        inner_bracket = 895000 * ratio_term - 584
+        
+        if inner_bracket > 0:
+            L_expected_ft = 0.334 * inner_bracket
+            L_expected_m = L_expected_ft * 0.3048  # feet to meters
+        else:
+            L_expected_ft = 0
+            L_expected_m = 0
+        
+        # B. Wild Flyrock (Safety Limit) - Equation 18, Page 503
+        # L_wild (ft) = 853 × (d_in)^(2/3)
+        L_wild_ft = 853 * (hole_diameter_inches ** (2/3))
+        L_wild_m = L_wild_ft * 0.3048  # feet to meters
+        
+        # Display results with metrics
+        st.markdown("### 📊 Calculated Flyrock Distances")
+        
+        col_exp, col_wild = st.columns(2)
+        
+        with col_exp:
+            st.metric(
+                "Expected Flyrock (Normal)",
+                f"{L_expected_m:.1f} m",
+                help="Normal vertical face blast with proper design (Eq. 20)"
+            )
+            st.caption(f"≈ {L_expected_ft:.1f} ft")
+        
+        with col_wild:
+            st.metric(
+                "Wild Flyrock (Safety Limit)",
+                f"{L_wild_m:.1f} m",
+                delta=f"+{(L_wild_m - L_expected_m):.1f} m",
+                delta_color="inverse",
+                help="Maximum throw for safety planning (Eq. 18)"
+            )
+            st.caption(f"≈ {L_wild_ft:.1f} ft")
+        
+        # Safety recommendations
+        st.markdown("### 🛡️ Safety Zone Recommendations")
+        
+        # Define safety zones based on wild flyrock distance
+        red_zone = L_wild_m
+        yellow_zone = L_wild_m * 1.25
+        green_zone = L_wild_m * 1.5
+        
+        st.warning(f"""
+        **Recommended Safety Clearances:**
+        
+        - 🔴 **No-Access Zone:** {red_zone:.1f} m ({red_zone * 3.28084:.1f} ft)  
+          *All personnel must evacuate*
+          
+        - 🟡 **Restricted Zone:** {yellow_zone:.1f} m ({yellow_zone * 3.28084:.1f} ft)  
+          *Essential personnel only, with safety equipment*
+          
+        - 🟢 **Safe Zone:** {green_zone:.1f} m ({green_zone * 3.28084:.1f} ft)  
+          *Minimum safe distance for all operations*
+        """)
+        
+        # Formulas section
+        with st.expander("📐 View Roth (1979) Formulas", expanded=False):
+            st.markdown(r"""
+            **Source:** Roth, J. (1979). A Model for the Determination of Flyrock Range Based on Shot Design
+            
+            ---
+            
+            **A. Expected Flyrock (Normal Vertical Face)**  
+            *Equation 20, Page 532*
+            
+            For a well-designed shot in hard rock (Granite) using ANFO:
+            
+            $$L_{expected} \text{ (ft)} = 0.334 \times \left[ 895{,}000 \times \left( \frac{d_{in}}{12 \times b_{ft}} \right)^2 - 584 \right]$$
+            
+            Where:
+            - $d_{in}$ = Hole diameter in inches
+            - $b_{ft}$ = Burden in feet
+            
+            *If the term inside brackets is negative, flyrock distance is 0.*
+            
+            ---
+            
+            **B. Wild Flyrock (Safety Limit)**  
+            *Equation 18, Page 503*
+            
+            Maximum possible throw from wild shots (cratering, poor stemming, geological faults):
+            
+            $$L_{wild} \text{ (ft)} = 853 \times (d_{in})^{2/3}$$
+            
+            Where:
+            - $d_{in}$ = Borehole diameter in inches
+            
+            ---
+            
+            **Current Parameters:**
+            - Hole Diameter: """ + f"{hole_diameter:.2f} mm ({hole_diameter_inches:.2f} inches)" + """
+            - Burden: """ + f"{calculated_burden:.2f} m ({burden_feet:.2f} feet)" + """
+            """)
+        
+        # Input assumptions and notes
+        st.info("""
+        **📝 Notes:**
+        - These formulas are empirically derived for ANFO in hard rock (granite)
+        - Expected flyrock assumes proper stemming, vertical face, and good design
+        - Wild flyrock represents worst-case scenarios for safety planning
+        - Always use the **Wild Flyrock** distance for safety zone calculations
+        - Local regulations may require additional safety factors
         """)
     
     # Create tabs for 3D and 2D views
